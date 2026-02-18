@@ -13,5 +13,8 @@ Backend: FastAPI
 AI: HuggingFace, PyTorch, OpenCV  
 
 ## Team
-- Your Name
-- Friend Name
+- Thushar 
+- Samyuktha
+- Saranya 
+- Vedika
+- Russheka
