@@ -1,36 +1,40 @@
 import re
 from transformers import pipeline
 
-classifier=pipeline(
-    "text-classification",
-    model="cybersectony/phishing-email-detection-distilbert_v2.4.1"
-)
+# semantic fraud detection model
+classifier=pipeline("zero-shot-classification",
+                    model="facebook/bart-large-mnli")
 
-def keyword_score(text):
-    suspicious=["urgent","verify","password","login","bank","otp","click","suspend","secure","account"]
-    words=text.lower().split()
-    hits=sum(1 for w in words if w in suspicious)
-    return min(hits/5,1.0)
+FRAUD_LABELS=[
+    "phishing attempt",
+    "credential theft",
+    "financial scam",
+    "social engineering attack"
+]
 
-def url_score(text):
-    urls=re.findall(r'http[s]?://\S+',text)
-    if not urls:
-        return 0
-    score=0
-    for url in urls:
-        if any(x in url.lower() for x in ["login","secure","verify","bank","account"]):
-            score+=0.5
+def ai_score(text:str)->float:
+    result=classifier(text,FRAUD_LABELS)
+    return max(result["scores"])
+
+def heuristic_score(text:str)->float:
+    text=text.lower()
+    score=0.0
+
+    if re.search(r"http[s]?://",text):
+        score+=0.3
+
+    if any(w in text for w in ["password","otp","pin","account","verify"]):
+        score+=0.3
+
+    if any(w in text for w in ["urgent","immediately","suspended","blocked"]):
+        score+=0.2
+
     return min(score,1.0)
 
-def detect_phishing(text):
-    ai_result=classifier(text)[0]
-    ai_score=ai_result["score"]
+def detect_phishing(text:str)->float:
+    ai=ai_score(text)
+    h=heuristic_score(text)
 
-    k_score=keyword_score(text)
-    u_score=url_score(text)
-
-    # stronger heuristic weighting
-    final=0.4*ai_score+0.4*k_score+0.2*u_score
-
+    # hybrid fusion
+    final=0.7*ai+0.3*h
     return round(min(final,1.0),2)
-

@@ -10,4 +10,8 @@ class TextInput(BaseModel):
 @router.post("/analyze")
 def analyze(data:TextInput):
     score=detect_phishing(data.text)
-    return {"risk_score":score}
+    return {
+    "type":"text",
+    "text_risk":score
+}
+
