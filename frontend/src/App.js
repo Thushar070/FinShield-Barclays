@@ -9,13 +9,11 @@ function App(){
   const[result,setResult]=useState(null);
   const[history,setHistory]=useState([]);
 
-  // load history
   useEffect(()=>{
     const saved=localStorage.getItem("finshield_history");
     if(saved) setHistory(JSON.parse(saved));
   },[]);
 
-  // save history
   useEffect(()=>{
     localStorage.setItem("finshield_history",JSON.stringify(history));
   },[history]);
@@ -29,6 +27,24 @@ function App(){
     setHistory([entry,...history.slice(0,9)]);
   };
 
+  const sendFile=async(endpoint,typeKey)=>{
+    if(!file) return;
+
+    const formData=new FormData();
+    formData.append("file",file);
+
+    const res=await fetch(`http://127.0.0.1:8000/${endpoint}`,{
+      method:"POST",
+      body:formData
+    });
+
+    const data=await res.json();
+    setResult(data);
+
+    const score=data[`${typeKey}_risk`];
+    if(score!==undefined) addToHistory(typeKey,score);
+  };
+
   const analyzeText=async()=>{
     const res=await fetch("http://127.0.0.1:8000/analyze",{
       method:"POST",
@@ -40,22 +56,7 @@ function App(){
     if(data.text_risk!==undefined) addToHistory("Text",data.text_risk);
   };
 
-  const analyzeImage=async()=>{
-    if(!file) return;
-
-    const formData=new FormData();
-    formData.append("file",file);
-
-    const res=await fetch("http://127.0.0.1:8000/analyze-image",{
-      method:"POST",
-      body:formData
-    });
-    const data=await res.json();
-    setResult(data);
-    if(data.image_risk!==undefined) addToHistory("Image",data.image_risk);
-  };
-
-  const score=result?.text_risk ?? result?.image_risk;
+  const score=result?.text_risk ?? result?.image_risk ?? result?.audio_risk ?? result?.video_risk;
 
   const riskClass=(s)=>{
     if(!s) return "";
@@ -76,8 +77,10 @@ function App(){
 
       <aside className="sidebar">
         <h2>FinShield</h2>
-        <button onClick={()=>{setMode("text");setResult(null);}}>Text Detection</button>
-        <button onClick={()=>{setMode("image");setResult(null);}}>Image Detection</button>
+        <button onClick={()=>{setMode("text");setResult(null);}}>Text</button>
+        <button onClick={()=>{setMode("image");setResult(null);}}>Image</button>
+        <button onClick={()=>{setMode("audio");setResult(null);}}>Audio</button>
+        <button onClick={()=>{setMode("video");setResult(null);}}>Video</button>
       </aside>
 
       <main className="content">
@@ -86,33 +89,29 @@ function App(){
           <h1>Fraud Detection Dashboard</h1>
         </header>
 
-        {/* TEXT MODE */}
         {mode==="text" && (
           <div className="card">
             <h3>Analyze Suspicious Message</h3>
-
-            <textarea
-              rows="6"
-              placeholder="Paste suspicious message..."
+            <textarea rows="6"
               value={text}
               onChange={(e)=>setText(e.target.value)}
+              placeholder="Paste suspicious message..."
             />
-
             <button onClick={analyzeText}>Analyze</button>
           </div>
         )}
 
-        {/* IMAGE MODE */}
-        {mode==="image" && (
+        {(mode==="image"||mode==="audio"||mode==="video") && (
           <div className="card">
-            <h3>Upload Suspicious Screenshot</h3>
-
+            <h3>Upload {mode.charAt(0).toUpperCase()+mode.slice(1)}</h3>
             <input type="file" onChange={(e)=>setFile(e.target.files[0])}/>
-            <button onClick={analyzeImage}>Analyze</button>
+
+            {mode==="image" && <button onClick={()=>sendFile("analyze-image","image")}>Analyze</button>}
+            {mode==="audio" && <button onClick={()=>sendFile("analyze-audio","audio")}>Analyze</button>}
+            {mode==="video" && <button onClick={()=>sendFile("analyze-video","video")}>Analyze</button>}
           </div>
         )}
 
-        {/* RESULT PANEL */}
         {score!==undefined && (
           <div className="card">
             <h3>Risk Assessment</h3>
@@ -123,17 +122,13 @@ function App(){
 
             <p className="explanation">{explanation(score)}</p>
 
-            {/* RISK BAR */}
             <div className="chart">
-              <div
-                className={`bar ${riskClass(score)}`}
-                style={{width:`${score*100}%`}}
-              ></div>
+              <div className={`bar ${riskClass(score)}`}
+                   style={{width:`${score*100}%`}}></div>
             </div>
           </div>
         )}
 
-        {/* HISTORY */}
         <div className="card">
           <h3>Recent Scans</h3>
 
