@@ -1,23 +1,27 @@
 import pytesseract
-from PIL import Image
+import cv2
 from ai_engine.text.phishing_model import detect_phishing
 
-# Tell python where tesseract is installed (Windows path)
-pytesseract.pytesseract.tesseract_cmd=r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+def detect_image_phishing(image_path: str) -> dict:
+    img = cv2.imread(image_path)
+    if img is None:
+        return {"score": 0.0, "ocr_text": "", "signals": []}
 
-def detect_image_phishing(image_path:str)->float:
+    # Extract text with Tesseract
     try:
-        img=Image.open(image_path)
-
-        # extract text from image
-        extracted_text=pytesseract.image_to_string(img)
-
-        if not extracted_text.strip():
-            return 0.0
-
-        # reuse text detector on OCR output
-        score=detect_phishing(extracted_text)
-        return score
-
+        text = pytesseract.image_to_string(img)
     except Exception:
-        return 0.0
+        text = ""
+
+    # Skip empty images
+    if len(text.strip()) < 5:
+        return {"score": 0.0, "ocr_text": "", "signals": ["No text detected in image"]}
+
+    # Analyze text using hybrid model
+    analysis = detect_phishing(text)
+    
+    return {
+        "score": analysis["final_score"],
+        "ocr_text": text.strip(),
+        "signals": analysis["signals"]
+    }

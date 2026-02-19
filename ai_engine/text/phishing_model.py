@@ -1,40 +1,49 @@
-import re
 from transformers import pipeline
+from ai_engine.hybrid_scorer import analyze_heuristic_signals, combine_scores
 
-# semantic fraud detection model
-classifier=pipeline("zero-shot-classification",
-                    model="facebook/bart-large-mnli")
+# load once at startup
+classifier = pipeline(
+    "text-classification",
+    model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+)
 
-FRAUD_LABELS=[
-    "phishing attempt",
-    "credential theft",
-    "financial scam",
-    "social engineering attack"
-]
+def detect_phishing(text: str) -> dict:
+    """
+    Returns full analysis including hybrid score, raw scores, and signals.
+    """
+    if not text.strip():
+        return {
+            "final_score": 0.0,
+            "ai_score": 0.0,
+            "heuristic_score": 0.0,
+            "signals": ["No content provided"]
+        }
 
-def ai_score(text:str)->float:
-    result=classifier(text,FRAUD_LABELS)
-    return max(result["scores"])
+    # 1. AI BERT Model
+    result = classifier(text[:512])[0]
+    # BERT model returns LABEL_0 (Benign) or LABEL_1 (Spam/Phishing)
+    # The 'score' is confidence in that label.
+    # We normalize to always return P(Phishing)
+    if result["label"].lower() in ["spam", "phishing", "label_1"]:
+        ai_score = round(result["score"], 2)
+    else:
+        ai_score = round(1 - result["score"], 2)
 
-def heuristic_score(text:str)->float:
-    text=text.lower()
-    score=0.0
+    # 2. Heuristic Analysis
+    heuristic_data = analyze_heuristic_signals(text)
+    heuristic_score = heuristic_data["heuristic_score"]
 
-    if re.search(r"http[s]?://",text):
-        score+=0.3
+    # 3. Combine
+    final_score = combine_scores(ai_score, heuristic_data)
 
-    if any(w in text for w in ["password","otp","pin","account","verify"]):
-        score+=0.3
+    return {
+        "final_score": final_score,
+        "ai_score": ai_score,
+        "heuristic_score": heuristic_score,
+        "signals": heuristic_data["signals"],
+        "categories": heuristic_data["categories"]
+    }
 
-    if any(w in text for w in ["urgent","immediately","suspended","blocked"]):
-        score+=0.2
-
-    return min(score,1.0)
-
-def detect_phishing(text:str)->float:
-    ai=ai_score(text)
-    h=heuristic_score(text)
-
-    # hybrid fusion
-    final=0.7*ai+0.3*h
-    return round(min(final,1.0),2)
+def get_legacy_score(text: str) -> float:
+    """Wrapper for older consumers expecting just a float"""
+    return detect_phishing(text)["final_score"]

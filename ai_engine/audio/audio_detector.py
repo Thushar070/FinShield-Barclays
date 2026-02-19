@@ -1,25 +1,43 @@
 from faster_whisper import WhisperModel
 from ai_engine.text.phishing_model import detect_phishing
+import logging
 
-# fast lightweight model
-model=WhisperModel("tiny",device="cpu",compute_type="int8")
+logger = logging.getLogger(__name__)
 
-def detect_audio_fraud(audio_path:str)->float:
-    segments,_=model.transcribe(audio_path,beam_size=1)
+# Load model once at module level for performance
+try:
+    model = WhisperModel("tiny", device="cpu", compute_type="int8")
+except Exception as e:
+    logger.error(f"Failed to load Whisper model: {e}")
+    model = None
 
-    transcript=""
-    count=0
+def detect_audio_fraud(audio_path: str) -> dict:
+    if not model:
+        return {"score": 0.0, "transcription": "", "signals": ["Audio model unavailable"]}
 
-    # read only first few segments for speed
-    for seg in segments:
-        transcript+=seg.text+" "
-        count+=1
-        if count>=5:   # limit processing
-            break
+    try:
+        segments, _ = model.transcribe(audio_path, beam_size=1)
+        
+        # Collect first few segments for speed
+        transcript_parts = []
+        for i, segment in enumerate(segments):
+            transcript_parts.append(segment.text)
+            if i >= 5:  # Limit to first 5 segments (~30s)
+                break
+        
+        transcript = " ".join(transcript_parts).strip()
+        
+        if not transcript:
+            return {"score": 0.0, "transcription": "", "signals": ["No speech detected"]}
 
-    transcript=transcript.strip()
+        analysis = detect_phishing(transcript)
+        
+        return {
+            "score": analysis["final_score"],
+            "transcription": transcript,
+            "signals": analysis["signals"]
+        }
 
-    if not transcript:
-        return 0.0
-
-    return detect_phishing(transcript)
+    except Exception as e:
+        logger.error(f"Audio transcription failed: {e}")
+        return {"score": 0.0, "transcription": "", "signals": ["Audio processing error"]}

@@ -1,2 +1,17 @@
 fastapi
 uvicorn
+python-multipart
+transformers
+faster-whisper
+pytesseract
+opencv-python-headless
+moviepy
+Pillow
+torch
+python-jose[cryptography]
+passlib[bcrypt]
+sqlalchemy
+aiosqlite
+fpdf2
+slowapi
+python-dotenv

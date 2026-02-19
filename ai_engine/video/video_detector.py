@@ -1,55 +1,65 @@
 import cv2
 import os
+import logging
 from moviepy import VideoFileClip
-
 from ai_engine.audio.audio_detector import detect_audio_fraud
 from ai_engine.image.image_detector import detect_image_phishing
 
+logger = logging.getLogger(__name__)
 
-def detect_video_fraud(video_path:str)->float:
+def detect_video_fraud(video_path: str) -> dict:
+    audio_result = {"score": 0.0, "transcription": "", "signals": []}
+    frame_result = {"score": 0.0, "ocr_text": "", "signals": []}
+    
+    audio_path = None
+    frame_path = None
 
-    audio_score=0.0
-    frame_score=0.0
-
-    # ---------- extract audio ----------
-    audio_path=None
+    # 1. Audio Analysis
     try:
-        clip=VideoFileClip(video_path)
-        if clip.audio is not None:
-            audio_path=video_path+"_audio.wav"
-            clip.audio.write_audiofile(audio_path,verbose=False,logger=None)
-            audio_score=detect_audio_fraud(audio_path)
+        clip = VideoFileClip(video_path)
+        if clip.audio:
+            audio_path = video_path + "_temp.wav"
+            clip.audio.write_audiofile(audio_path, verbose=False, logger=None)
+            audio_result = detect_audio_fraud(audio_path)
         clip.close()
     except Exception as e:
-        audio_score=0.0
+        logger.warning(f"Audio extraction warning: {e}")
 
-    # ---------- extract frames ----------
-    cap=cv2.VideoCapture(video_path)
-    frame_count=0
+    # 2. Frame Analysis (Extract 1 key frame)
+    try:
+        cap = cv2.VideoCapture(video_path)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret:
+                frame_path = video_path + "_temp.jpg"
+                cv2.imwrite(frame_path, frame)
+                frame_result = detect_image_phishing(frame_path)
+        cap.release()
+    except Exception as e:
+        logger.warning(f"Frame extraction warning: {e}")
 
-    while cap.isOpened():
-        ret,frame=cap.read()
-        if not ret or frame_count>=3:
-            break
-
-        frame_path=f"{video_path}_frame{frame_count}.jpg"
-        cv2.imwrite(frame_path,frame)
-
-        score=detect_image_phishing(frame_path)
-        frame_score=max(frame_score,score)
-
-        # cleanup temp frame
-        if os.path.exists(frame_path):
-            os.remove(frame_path)
-
-        frame_count+=1
-
-    cap.release()
-
-    # cleanup audio file
+    # Cleanup temp files
     if audio_path and os.path.exists(audio_path):
-        os.remove(audio_path)
+        try: os.remove(audio_path)
+        except: pass
+        
+    if frame_path and os.path.exists(frame_path):
+        try: os.remove(frame_path)
+        except: pass
 
-    # ---------- combine ----------
-    final=max(audio_score,frame_score)
-    return round(final,2)
+    # Combine Results
+    final_score = round(max(audio_result["score"], frame_result["score"]), 2)
+    
+    combined_signals = []
+    if audio_result["score"] > 0.4:
+        combined_signals.append(f"Audio Risk ({audio_result['score']}): " + ", ".join(audio_result["signals"][:2]))
+    if frame_result["score"] > 0.4:
+        combined_signals.append(f"Visual Risk ({frame_result['score']}): " + ", ".join(frame_result["signals"][:2]))
+        
+    combined_text = f"Audio: {audio_result['transcription']} | Visual: {frame_result.get('ocr_text','')}"
+
+    return {
+        "score": final_score,
+        "transcription": combined_text,
+        "signals": combined_signals
+    }
