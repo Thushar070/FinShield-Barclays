@@ -17,6 +17,9 @@ class User(Base):
     username = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, default="user")  # user / admin
+    trust_score = Column(Float, default=100.0) # 0 to 100, drops on bad habits
+    exposure_level = Column(String, default="LOW") # LOW/MEDIUM/HIGH/CRITICAL
+    targeted_scam_types = Column(JSON, default=list) # e.g. ["Phishing", "Reward Trap"]
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -76,6 +79,8 @@ class Explanation(Base):
     signals = Column(JSON, nullable=True)
     reasoning = Column(Text, nullable=True)
     confidence = Column(Float, default=0.0)
+    confidence_stability = Column(String, nullable=True) # "HIGH", "FLUCTUATING"
+    counterfactual = Column(String, nullable=True) # "If X was removed, risk drops by Y"
     model_used = Column(String, nullable=True)
 
     scan = relationship("Scan", back_populates="explanation")

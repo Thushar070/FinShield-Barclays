@@ -15,6 +15,9 @@ def get_profile(user: User = Depends(get_current_user), db: Session = Depends(ge
         "email": user.email,
         "username": user.username,
         "role": user.role,
+        "trust_score": user.trust_score,
+        "exposure_level": user.exposure_level,
+        "targeted_scam_types": user.targeted_scam_types,
         "created_at": user.created_at.isoformat() if user.created_at else "",
         "total_scans": total
     }

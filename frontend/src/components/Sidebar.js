@@ -1,9 +1,11 @@
-import { LayoutDashboard, ScanSearch, History, User, LogOut } from "lucide-react";
+import { LayoutDashboard, ScanSearch, History, User, LogOut, Users } from "lucide-react";
 
 const navItems = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     { id: "scan", label: "New Scan", icon: ScanSearch },
     { id: "history", label: "History", icon: History },
+    { id: "simulation", label: "Simulation", icon: LayoutDashboard },
+    { id: "enterprise", label: "Enterprise", icon: Users },
     { id: "profile", label: "Profile", icon: User },
 ];
 

@@ -28,9 +28,12 @@ body {
 }
 
 .card {
-    background-color: var(--bg-panel);
-    border: 1px solid var(--border-console);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    background: rgba(19, 21, 26, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
 }
 
 .sidebar {
@@ -240,13 +243,17 @@ body {
 
 /* NEW STATS CARDS */
 .stat-card {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-console);
+    background: rgba(19, 21, 26, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
     color: var(--text-primary);
     display: flex;
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    border-radius: 12px;
 }
 
 .stat-header {

@@ -12,7 +12,12 @@ import SystemStatus from "../components/SystemStatus";
 import OnboardingTour from "../components/OnboardingTour";
 import HowItWorksModal from "../components/HowItWorksModal";
 import ScanExamples from "../components/ScanExamples";
-import { FileText, Image, Mic, Video, Upload, Send, AlertTriangle, RefreshCw, HelpCircle, File, Lock, CheckCircle } from "lucide-react";
+import ThreatRadar from "../components/ThreatRadar";
+import ScanJourneyTimeline from "../components/ScanJourneyTimeline";
+import SimulationMode from "../components/SimulationMode";
+import Chatbot from "../components/Chatbot";
+import EnterpriseConsole from "../components/EnterpriseConsole";
+import { FileText, Image, Mic, Video, Upload, Send, AlertTriangle, RefreshCw, HelpCircle, File, Lock, CheckCircle, Users } from "lucide-react";
 
 function safeString(val) {
     if (val === null || val === undefined) return "";
@@ -50,6 +55,7 @@ const SCAN_MODES = [
     { id: "image", label: "Image Analysis", icon: Image, desc: "Scan screenshots or logos for brand impersonation." },
     { id: "audio", label: "Audio Analysis", icon: Mic, desc: "Detect voice scams or deepfake audio patterns." },
     { id: "video", label: "Video Analysis", icon: Video, desc: "Identify deepfake faces or manipulated video content." },
+    { id: "fusion", label: "Multi-Modal Scan", icon: Lock, desc: "Correlate text context and an image into a single unified score." },
 ];
 
 const DEFAULT_STATS = {
@@ -172,14 +178,29 @@ export default function Dashboard() {
     }
 
     async function analyzeFile(endpoint) {
-        if (!file) return;
+        if (!file && text.length === 0) return;
         if (loading) return;
 
         setLoading(true);
         setError("");
         setResult(null);
         try {
-            const data = await apiUpload(endpoint, file);
+            let data;
+            if (endpoint === 'fusion') {
+                const formData = new FormData();
+                if (file) formData.append("file", file);
+                formData.append("text", text);
+
+                const token = localStorage.getItem("token");
+                const res = await fetch("http://localhost:8000/api/v1/analyze/fusion", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                    body: formData
+                });
+                data = await res.json();
+            } else {
+                data = await apiUpload(endpoint, file);
+            }
 
             if (data.success === false) {
                 setError(safeString(data.message));
@@ -225,12 +246,16 @@ export default function Dashboard() {
                             {activeTab === "overview" && "Dashboard Overview"}
                             {activeTab === "scan" && "New Scan"}
                             {activeTab === "history" && "Scan History"}
+                            {activeTab === "simulation" && "Simulation Training"}
+                            {activeTab === "enterprise" && "Enterprise Console"}
                             {activeTab === "profile" && "Analyst Profile"}
                         </h1>
                         <p className="page-subtitle">
                             {activeTab === "overview" && "Real-time fraud intelligence console"}
                             {activeTab === "scan" && "Multi-modal content analysis breakdown"}
                             {activeTab === "history" && "Audit log of all analyzed content"}
+                            {activeTab === "simulation" && "Interactive phishing & scam awareness training"}
+                            {activeTab === "enterprise" && "Global Fraud Case Management & RBAC Configuration"}
                             {activeTab === "profile" && "Manage your credentials & access"}
                         </p>
                     </div>
@@ -251,10 +276,11 @@ export default function Dashboard() {
                     {activeTab === "overview" && (
                         <>
                             <StatsCards stats={stats} />
-                            <div className="grid-2">
+                            <div className="grid-2" style={{ gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "24px" }}>
                                 <DashboardCharts stats={stats} />
-                                <ActivityFeed scans={history.slice(0, 6)} />
+                                <ThreatRadar />
                             </div>
+                            <ActivityFeed scans={history.slice(0, 6)} />
                         </>
                     )}
 
@@ -277,6 +303,9 @@ export default function Dashboard() {
                                     ))}
                                 </div>
 
+                                <ScanJourneyTimeline step={loading ? 'models' : (result ? 'decision' : 'preprocessing')} />
+
+
                                 {/* Text Input */}
                                 <div className="card scan-card">
                                     <h3><FileText size={18} /> Direct Input</h3>
@@ -285,7 +314,6 @@ export default function Dashboard() {
                                         value={text}
                                         onChange={(e) => setText(e.target.value)}
                                         placeholder="Paste email content, SMS, or suspicious text here..."
-                                        disabled={!!file}
                                     />
                                     {!file && (
                                         <button className="btn-primary" onClick={analyzeText} disabled={loading || !text.trim()}>
@@ -329,33 +357,44 @@ export default function Dashboard() {
                                                 <button className="btn-text-sm" onClick={() => setFile(null)}>Remove</button>
                                             </div>
 
-                                            <div className="scan-actions-grid">
+                                            <div className="scan-actions-grid" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button
+                                                        className="btn-primary"
+                                                        onClick={() => analyzeFile("/analyze-image")}
+                                                        disabled={loading || !isImage}
+                                                        title={isImage ? "Use Tesseract OCR" : "File is not an image"}
+                                                        style={{ flex: 1, opacity: isImage ? 1 : 0.5 }}
+                                                    >
+                                                        <Image size={16} /> Scan Image
+                                                    </button>
+                                                    <button
+                                                        className="btn-primary"
+                                                        onClick={() => analyzeFile("/analyze-audio")}
+                                                        disabled={loading || !isAudio}
+                                                        title={isAudio ? "Transcribe and Analyze" : "File is not audio"}
+                                                        style={{ flex: 1, opacity: isAudio ? 1 : 0.5 }}
+                                                    >
+                                                        <Mic size={16} /> Scan Audio
+                                                    </button>
+                                                    <button
+                                                        className="btn-primary"
+                                                        onClick={() => analyzeFile("/analyze-video")}
+                                                        disabled={loading || !isVideo}
+                                                        title={isVideo ? "Analyze Frames and Audio" : "File is not video"}
+                                                        style={{ flex: 1, opacity: isVideo ? 1 : 0.5 }}
+                                                    >
+                                                        <Video size={16} /> Scan Video
+                                                    </button>
+                                                </div>
                                                 <button
-                                                    className="btn-primary"
-                                                    onClick={() => analyzeFile("/analyze-image")}
-                                                    disabled={loading || !isImage}
-                                                    title={isImage ? "Use Tesseract OCR" : "File is not an image"}
-                                                    style={{ opacity: isImage ? 1 : 0.5 }}
+                                                    className="btn-secondary"
+                                                    onClick={() => analyzeFile('fusion')}
+                                                    disabled={loading || !file}
+                                                    title="Requires an image/document and optional text context in the box above"
+                                                    style={{ width: '100%', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
                                                 >
-                                                    <Image size={16} /> Scan Image
-                                                </button>
-                                                <button
-                                                    className="btn-primary"
-                                                    onClick={() => analyzeFile("/analyze-audio")}
-                                                    disabled={loading || !isAudio}
-                                                    title={isAudio ? "Transcribe and Analyze" : "File is not audio"}
-                                                    style={{ opacity: isAudio ? 1 : 0.5 }}
-                                                >
-                                                    <Mic size={16} /> Scan Audio
-                                                </button>
-                                                <button
-                                                    className="btn-primary"
-                                                    onClick={() => analyzeFile("/analyze-video")}
-                                                    disabled={loading || !isVideo}
-                                                    title={isVideo ? "Analyze Frames and Audio" : "File is not video"}
-                                                    style={{ opacity: isVideo ? 1 : 0.5 }}
-                                                >
-                                                    <Video size={16} /> Scan Video
+                                                    <Lock size={16} /> Run Multi-Modal Fusion (File + Text)
                                                 </button>
                                             </div>
                                         </div>
@@ -456,10 +495,18 @@ export default function Dashboard() {
                         </div>
                     )}
 
+                    {/* SIMULATION TAB */}
+                    {activeTab === "simulation" && <SimulationMode />}
+
+                    {/* ENTERPRISE TAB */}
+                    {activeTab === "enterprise" && <EnterpriseConsole />}
+
                     {/* PROFILE TAB */}
                     {activeTab === "profile" && <UserProfile user={user} />}
                 </div>
             </main>
+
+            <Chatbot />
         </div>
     );
 }

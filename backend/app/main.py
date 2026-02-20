@@ -20,6 +20,9 @@ from backend.app.routes.video import router as video_router
 from backend.app.routes.history import router as history_router
 from backend.app.routes.user import router as user_router
 from backend.app.routes.reports import router as reports_router
+from backend.app.routes.intel import router as intel_router
+import asyncio
+from backend.app.services.threat_intel_service import threat_intel_engine
 
 load_dotenv()
 
@@ -75,8 +78,8 @@ app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -90,12 +93,23 @@ app.include_router(video_router)
 app.include_router(history_router)
 app.include_router(user_router)
 app.include_router(reports_router)
+app.include_router(intel_router)
 
 
 @app.on_event("startup")
-def startup():
+async def startup():
+    logger.info("====================================")
+    logger.info("SERVER STARTED")
+    logger.info("PORT NUMBER: 8000")
+    logger.info("MODEL LOAD STATUS: LAZY-LOADING ENABLED (Models load on first request)")
+    logger.info("====================================")
+
     logger.info("Initializing FinShield database...")
     init_db()
+    
+    logger.info("Starting Global Threat Intel background sync...")
+    asyncio.create_task(threat_intel_engine.start_sync_loop())
+    
     logger.info("FinShield API v2.0.0 ready")
 
 

@@ -1,11 +1,21 @@
+import logging
 from transformers import pipeline
 from ai_engine.hybrid_scorer import analyze_heuristic_signals, combine_scores
 
-# load once at startup
-classifier = pipeline(
-    "text-classification",
-    model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
-)
+logger = logging.getLogger("finshield")
+
+# lazy load
+classifier = None
+
+def _get_classifier():
+    global classifier
+    if classifier is None:
+        logger.info("Initializing text classification model lazily...")
+        classifier = pipeline(
+            "text-classification",
+            model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+        )
+    return classifier
 
 def detect_phishing(text: str) -> dict:
     """
@@ -20,7 +30,8 @@ def detect_phishing(text: str) -> dict:
         }
 
     # 1. AI BERT Model
-    result = classifier(text[:512])[0]
+    model = _get_classifier()
+    result = model(text[:512])[0]
     # BERT model returns LABEL_0 (Benign) or LABEL_1 (Spam/Phishing)
     # The 'score' is confidence in that label.
     # We normalize to always return P(Phishing)

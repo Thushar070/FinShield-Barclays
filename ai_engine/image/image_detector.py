@@ -1,6 +1,8 @@
+print("IMAGE DETECTOR: STARTING TO IMPORT")
 import pytesseract
 import cv2
 from ai_engine.text.phishing_model import detect_phishing
+print("IMAGE DETECTOR: ALL IMPORTS SUCCESSFUL. DEFINING FUNCTIONS.")
 
 def detect_image_phishing(image_path: str) -> dict:
     img = cv2.imread(image_path)

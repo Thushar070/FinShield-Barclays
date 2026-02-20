@@ -2,16 +2,24 @@ from faster_whisper import WhisperModel
 from ai_engine.text.phishing_model import detect_phishing
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("finshield")
 
-# Load model once at module level for performance
-try:
-    model = WhisperModel("tiny", device="cpu", compute_type="int8")
-except Exception as e:
-    logger.error(f"Failed to load Whisper model: {e}")
-    model = None
+# lazy load
+model_instance = None
+
+def _get_model():
+    global model_instance
+    if model_instance is None:
+        try:
+            logger.info("Initializing Audio Whisper model lazily...")
+            model_instance = WhisperModel("tiny", device="cpu", compute_type="int8")
+        except Exception as e:
+            logger.error(f"Failed to load Whisper model: {e}")
+            model_instance = False # Indicate load failure vs not loaded
+    return model_instance
 
 def detect_audio_fraud(audio_path: str) -> dict:
+    model = _get_model()
     if not model:
         return {"score": 0.0, "transcription": "", "signals": ["Audio model unavailable"]}
 
